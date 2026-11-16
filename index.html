@@ -1,0 +1,613 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NBA Slate Parlay Builder</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+
+/* Layout: sticky control rail on the left; suggestions → slip → leg pool on the right. Stacks on phones. */
+:root {
+  --bg: #f3f4f6;
+  --panel: #ffffff;
+  --ink: #16202c;
+  --muted: #5b6676;
+  --line: #d9dee5;
+  --accent: #d4581a;       /* basketball orange */
+  --accent-ink: #ffffff;
+  --accent-soft: #fbe7dc;
+  --good: #1d7a46;
+  --good-soft: #e1f2e8;
+  --bad: #b3261e;
+  --bad-soft: #f8e1df;
+  --warn: #8a6100;
+  --warn-soft: #fbf0d4;
+  --lock: #1f5fae;
+  --lock-soft: #e1ebf8;
+  --font-display: "Barlow Condensed", "Arial Narrow", sans-serif;
+  --font-body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, Consolas, monospace;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #10151c; --panel: #18202a; --ink: #e7ebf0; --muted: #98a3b3; --line: #2b3643;
+    --accent: #f07a3a; --accent-ink: #1a0d05; --accent-soft: #3a2316;
+    --good: #5cc98a; --good-soft: #17301f; --bad: #f08a80; --bad-soft: #3a1c1a;
+    --warn: #e5b94e; --warn-soft: #33290f; --lock: #7fb0f0; --lock-soft: #172a42;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #10151c; --panel: #18202a; --ink: #e7ebf0; --muted: #98a3b3; --line: #2b3643;
+  --accent: #f07a3a; --accent-ink: #1a0d05; --accent-soft: #3a2316;
+  --good: #5cc98a; --good-soft: #17301f; --bad: #f08a80; --bad-soft: #3a1c1a;
+  --warn: #e5b94e; --warn-soft: #33290f; --lock: #7fb0f0; --lock-soft: #172a42;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { background: var(--bg); color: var(--ink); font: 14px/1.45 var(--font-body); }
+h1, h2, h3 { font-family: var(--font-display); font-weight: 700; letter-spacing: .01em; margin: 0; text-wrap: balance; }
+h1 { font-size: 30px; line-height: 1.05; }
+h2 { font-size: 21px; text-transform: uppercase; }
+h3 { font-size: 15px; text-transform: uppercase; color: var(--muted); letter-spacing: .05em; }
+.num, td.n, .mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+button, input, select, textarea { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+header.top { display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: end; justify-content: space-between; padding: 20px 20px 14px; border-bottom: 3px solid var(--accent); background: var(--panel); }
+header.top p { margin: 4px 0 0; color: var(--muted); max-width: 70ch; }
+.source { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.pill { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border-radius: 999px; font-size: 12px; font-weight: 600; background: var(--warn-soft); color: var(--warn); }
+.pill.ok { background: var(--good-soft); color: var(--good); }
+
+.wrap { display: grid; grid-template-columns: 300px minmax(0, 1fr); gap: 20px; padding: 20px; align-items: start; }
+@media (max-width: 900px) { .wrap { grid-template-columns: 1fr; } }
+
+.rail { position: sticky; top: 12px; display: flex; flex-direction: column; gap: 14px; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 16px; }
+@media (max-width: 900px) { .rail { position: static; } }
+.field { display: flex; flex-direction: column; gap: 6px; }
+.field label, .field .lbl { font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+.row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+select, input[type=number], input[type=text], textarea { background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 7px 9px; width: 100%; }
+textarea { font-family: var(--font-mono); font-size: 12px; min-height: 70px; resize: vertical; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { position: relative; }
+.chip input { position: absolute; opacity: 0; inset: 0; cursor: pointer; }
+.chip span { display: inline-block; padding: 5px 11px; border: 1px solid var(--line); border-radius: 999px; font-weight: 500; font-size: 13px; background: var(--bg); }
+.chip input:checked + span { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.chip input:focus-visible + span { outline: 2px solid var(--accent); outline-offset: 2px; }
+.hint { font-size: 12px; color: var(--muted); margin: 0; }
+.legcount { display: flex; gap: 4px; }
+.legcount button { flex: 1; padding: 7px 0; border: 1px solid var(--line); background: var(--bg); border-radius: 6px; font-family: var(--font-mono); font-weight: 500; cursor: pointer; }
+.legcount button[aria-pressed=true] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.btn { border: 1px solid var(--line); background: var(--panel); border-radius: 6px; padding: 7px 12px; cursor: pointer; font-weight: 500; }
+.btn:hover { border-color: var(--accent); }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 600; }
+.btn.small { padding: 3px 9px; font-size: 12px; }
+details.more summary { cursor: pointer; font-weight: 600; font-size: 13px; color: var(--muted); }
+details.more[open] summary { margin-bottom: 10px; }
+details.more .inner { display: flex; flex-direction: column; gap: 12px; }
+
+main { display: flex; flex-direction: column; gap: 20px; min-width: 0; }
+section.card { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 16px; }
+.sec-head { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: baseline; justify-content: space-between; margin-bottom: 12px; }
+.sec-head .meta { color: var(--muted); font-size: 13px; }
+
+.sugg { display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: 12px; }
+.combo { border: 1px solid var(--line); border-left: 4px solid var(--accent); border-radius: 6px; padding: 12px; display: flex; flex-direction: column; gap: 10px; background: var(--bg); }
+.combo .rank { font-family: var(--font-display); font-size: 18px; color: var(--accent); }
+.combo .top { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.combo .odds { font-family: var(--font-mono); font-size: 20px; font-weight: 500; }
+.combo ul { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 4px; font-size: 13px; }
+.combo li { display: flex; justify-content: space-between; gap: 8px; }
+.combo li .p { color: var(--muted); font-family: var(--font-mono); white-space: nowrap; }
+.stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.stat { background: var(--panel); border: 1px solid var(--line); border-radius: 5px; padding: 5px 7px; }
+.stat .k { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+.stat .v { font-family: var(--font-mono); font-weight: 500; }
+.pos { color: var(--good); } .neg { color: var(--bad); }
+.empty { padding: 18px; border: 1px dashed var(--line); border-radius: 6px; color: var(--muted); text-align: center; }
+
+.slip-grid { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 16px; }
+@media (max-width: 1100px) { .slip-grid { grid-template-columns: 1fr; } }
+.slip-legs { display: flex; flex-direction: column; gap: 6px; }
+.slip-leg { display: grid; grid-template-columns: 1fr auto auto; gap: 10px; align-items: center; padding: 8px 10px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); }
+.slip-leg .who { font-weight: 600; }
+.slip-leg .what { color: var(--muted); font-size: 13px; }
+.slip-sum { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; align-content: start; }
+.big { background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 8px 10px; }
+.big .k { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+.big .v { font-family: var(--font-mono); font-size: 18px; font-weight: 500; }
+.big.wide { grid-column: 1 / -1; }
+.warnbox { grid-column: 1 / -1; background: var(--warn-soft); color: var(--warn); border-radius: 6px; padding: 8px 10px; font-size: 13px; }
+
+.tablewrap { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-size: 13px; }
+th, td { padding: 6px 8px; border-bottom: 1px solid var(--line); text-align: left; white-space: nowrap; }
+th { font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); font-weight: 600; position: sticky; top: 0; background: var(--panel); }
+td.n, th.n { text-align: right; }
+tr.excluded td { opacity: .45; text-decoration: line-through; }
+tr.locked td:first-child { box-shadow: inset 3px 0 0 var(--lock); }
+tr.filtered td { opacity: .45; }
+.tag { display: inline-block; font-size: 11px; font-weight: 600; padding: 1px 7px; border-radius: 4px; text-transform: uppercase; letter-spacing: .03em; }
+.tag.over { background: var(--good-soft); color: var(--good); }
+.tag.under { background: var(--lock-soft); color: var(--lock); }
+.tag.home { background: var(--accent-soft); color: var(--accent); }
+.tag.away { background: var(--bg); color: var(--muted); border: 1px solid var(--line); }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 5px; overflow: hidden; }
+.seg button { border: 0; background: transparent; padding: 3px 8px; font-size: 12px; cursor: pointer; }
+.seg button + button { border-left: 1px solid var(--line); }
+.seg button[aria-pressed=true].lock { background: var(--lock); color: #fff; }
+.seg button[aria-pressed=true].excl { background: var(--bad); color: #fff; }
+.toast { position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%); background: var(--ink); color: var(--bg); padding: 8px 14px; border-radius: 6px; font-size: 13px; opacity: 0; transition: opacity .2s; pointer-events: none; }
+.toast.show { opacity: 1; }
+@media (prefers-reduced-motion: reduce) { .toast { transition: none; } }
+.foot { color: var(--muted); font-size: 12px; padding: 0 20px 24px; max-width: 90ch; }
+
+.games { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 8px; }
+.game { display: flex; gap: 8px; align-items: flex-start; padding: 8px 10px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); cursor: pointer; }
+.game .t { font-weight: 600; }
+.game .s { font-size: 12px; color: var(--muted); }
+.game.done { opacity: .5; cursor: default; }
+.game.pulled { border-color: var(--good); }
+.setup { display: flex; flex-wrap: wrap; gap: 10px; align-items: end; }
+.setup .field { min-width: 160px; }
+.setup .field.key { flex: 1 1 260px; }
+.status { font-size: 13px; color: var(--muted); }
+.status.err { color: var(--bad); }
+</style>
+</head>
+<body>
+<header class="top">
+  <div>
+    <h1>NBA Slate Parlay Builder</h1>
+    <p>Pulls today's NBA games and player props from The Odds API, prices every leg against the consensus of US sportsbooks, and ranks the parlays with the best expected value at your book.</p>
+  </div>
+  <div class="source"><span id="creditPill" class="pill">Credits: –</span></div>
+</header>
+
+<div class="wrap">
+  <aside class="rail" aria-label="Parlay settings">
+    <div class="field">
+      <span class="lbl" id="legsLbl">Number of legs</span>
+      <div class="legcount" role="group" aria-labelledby="legsLbl" id="legBtns"></div>
+      <label style="display:flex;gap:6px;align-items:center;font-size:13px"><input type="checkbox" id="legsUpTo"> Also show smaller parlays (2 up to this many legs)</label>
+    </div>
+    <div class="field"><span class="lbl">Props to include</span><div class="chips" id="propChips"></div></div>
+    <div class="field"><span class="lbl">Sides</span><div class="chips" id="sideChips"></div></div>
+    <div class="row2">
+      <div class="field">
+        <label for="minEdge">Min edge / leg</label>
+        <select id="minEdge"><option value="-1">Any</option><option value="-0.02">−2 pts</option><option value="0">0 pts</option><option value="0.01">1 pt</option><option value="0.02">2 pts</option><option value="0.03">3 pts</option></select>
+      </div>
+      <div class="field">
+        <label for="minProb">Min hit % / leg</label>
+        <select id="minProb"><option value="0">Any</option><option value="0.45">45%</option><option value="0.5">50%</option><option value="0.55">55%</option><option value="0.6">60%</option></select>
+      </div>
+    </div>
+    <div class="row2">
+      <div class="field">
+        <label for="maxGame">Max legs / game</label>
+        <select id="maxGame"><option value="1">1</option><option value="2">2</option><option value="9">No limit</option></select>
+      </div>
+      <div class="field">
+        <label for="rankBy">Rank by</label>
+        <select id="rankBy"><option value="ev">Expected value</option><option value="prob">Hit probability</option><option value="odds">Payout</option></select>
+      </div>
+    </div>
+    <details class="more">
+      <summary>More settings</summary>
+      <div class="inner">
+        <div class="row2">
+          <div class="field">
+            <label for="minBooks">Min books for fair price</label>
+            <select id="minBooks"><option>2</option><option>3</option><option>4</option><option>5</option></select>
+          </div>
+          <div class="field">
+            <label for="poolCap">Search top N legs</label>
+            <select id="poolCap"><option>15</option><option>25</option><option>35</option></select>
+          </div>
+        </div>
+        <div class="row2">
+          <div class="field"><label for="bankroll">Bankroll ($)</label><input type="number" id="bankroll" min="0" step="10"></div>
+          <div class="field"><label for="kellyFrac">Kelly fraction</label><select id="kellyFrac"><option value="0.1">1/10</option><option value="0.25">1/4</option><option value="0.5">1/2</option></select></div>
+        </div>
+      </div>
+    </details>
+    <button class="btn" id="resetBtn" type="button">Reset settings</button>
+  </aside>
+
+  <main>
+    <section class="card" aria-labelledby="slateH">
+      <div class="sec-head"><h2 id="slateH">Today's slate</h2><span class="meta" id="slateMeta"></span></div>
+      <div class="setup">
+        <div class="field key"><label for="apiKey">Odds API key (stays in this browser)</label><input type="password" id="apiKey" autocomplete="off" placeholder="Paste your key from the-odds-api.com"></div>
+        <div class="field"><label for="book">Your sportsbook</label><select id="book"></select></div>
+        <div class="field"><label for="slateDate">Date</label><input type="date" id="slateDate"></div>
+        <button class="btn" id="loadGames" type="button">Load games</button>
+      </div>
+      <div class="games" id="games" style="margin-top:12px"></div>
+      <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-top:12px">
+        <button class="btn primary" id="pullBtn" type="button" disabled>Pull props</button>
+        <span class="status" id="status" role="status" aria-live="polite"></span>
+      </div>
+    </section>
+
+    <section class="card" aria-labelledby="suggH">
+      <div class="sec-head"><h2 id="suggH">Suggested parlays</h2><span class="meta" id="suggMeta"></span></div>
+      <div class="sugg" id="sugg"></div>
+    </section>
+
+    <section class="card" aria-labelledby="slipH">
+      <div class="sec-head"><h2 id="slipH">Your slip</h2>
+        <div style="display:flex;gap:8px"><button class="btn small" id="copySlip" type="button">Copy slip</button><button class="btn small" id="clearSlip" type="button">Clear</button></div>
+      </div>
+      <div class="slip-grid"><div class="slip-legs" id="slipLegs"></div><div class="slip-sum" id="slipSum"></div></div>
+    </section>
+
+    <section class="card" aria-labelledby="poolH">
+      <div class="sec-head"><h2 id="poolH">Leg pool</h2><span class="meta">Fair % is the average no-vig probability across books. Lock a leg to put it in every suggestion, Exclude to drop it, + to add it to your slip.</span></div>
+      <div class="tablewrap"><table>
+        <thead><tr><th>Player</th><th>Game</th><th>Prop</th><th>Side</th><th class="n">Line</th><th class="n">Your odds</th><th class="n">Fair %</th><th class="n">Books</th><th class="n">Edge</th><th>Best price</th><th>Suggest</th><th></th></tr></thead>
+        <tbody id="poolBody"></tbody>
+      </table></div>
+    </section>
+  </main>
+</div>
+<p class="foot">Fair % averages each book's no-vig probability for the same line, so a leg only has an edge when your book pays better than the market as a whole. Parlay probabilities multiply legs as if independent; legs from one game are correlated, which is why the default is one leg per game. Each game you pull costs one credit per prop type (regions=us), and pulled odds are kept in this browser for the day so reloading doesn't spend credits again. Not betting advice.</p>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+(() => {
+"use strict";
+const API = "https://api.the-odds-api.com/v4/sports/basketball_nba";
+const MARKETS = { points: "player_points", threes: "player_threes", assists: "player_assists", rebounds: "player_rebounds" };
+const PROPS = Object.keys(MARKETS);
+const PROP_LABEL = { points: "PTS", threes: "3PM", assists: "AST", rebounds: "REB" };
+const BOOKS = [["draftkings", "DraftKings"], ["fanduel", "FanDuel"], ["betmgm", "BetMGM"], ["williamhill_us", "Caesars"],
+  ["espnbet", "ESPN BET"], ["fanatics", "Fanatics"], ["betrivers", "BetRivers"], ["hardrockbet", "Hard Rock Bet"], ["bovada", "Bovada"]];
+const BOOK_NAME = Object.fromEntries(BOOKS);
+const TEAM = { "Atlanta Hawks":"ATL","Boston Celtics":"BOS","Brooklyn Nets":"BKN","Charlotte Hornets":"CHA","Chicago Bulls":"CHI","Cleveland Cavaliers":"CLE","Dallas Mavericks":"DAL","Denver Nuggets":"DEN","Detroit Pistons":"DET","Golden State Warriors":"GSW","Houston Rockets":"HOU","Indiana Pacers":"IND","Los Angeles Clippers":"LAC","LA Clippers":"LAC","Los Angeles Lakers":"LAL","Memphis Grizzlies":"MEM","Miami Heat":"MIA","Milwaukee Bucks":"MIL","Minnesota Timberwolves":"MIN","New Orleans Pelicans":"NOP","New York Knicks":"NYK","Oklahoma City Thunder":"OKC","Orlando Magic":"ORL","Philadelphia 76ers":"PHI","Phoenix Suns":"PHX","Portland Trail Blazers":"POR","Sacramento Kings":"SAC","San Antonio Spurs":"SAS","Toronto Raptors":"TOR","Utah Jazz":"UTA","Washington Wizards":"WAS" };
+const abbr = n => TEAM[n] || (n || "").split(" ").pop().slice(0, 3).toUpperCase();
+
+const DEFAULTS = { legs: 3, upTo: false, props: [...PROPS], sides: ["over", "under"], minEdge: "-1", minProb: "0",
+  maxGame: "1", rankBy: "ev", minBooks: "3", poolCap: "25", bankroll: 500, kellyFrac: "0.25", book: "draftkings" };
+const store = {
+  get(k) { try { return JSON.parse(localStorage.getItem("nbaSlate." + k)); } catch (e) { return null; } },
+  set(k, v) { try { localStorage.setItem("nbaSlate." + k, JSON.stringify(v)); } catch (e) {} }
+};
+let S = Object.assign({}, DEFAULTS, store.get("settings") || {});
+let games = [];           // events for the date
+let picked = new Set();   // event ids chosen to pull
+let oddsCache = {};       // event id -> raw odds json (for the date)
+let legs = [], legState = {}, slip = [];
+
+const $ = id => document.getElementById(id);
+const fmtPct = (p, d = 1) => (p * 100).toFixed(d) + "%";
+const fmtOdds = o => (o > 0 ? "+" : "") + Math.round(o);
+const decToAm = d => d >= 2 ? (d - 1) * 100 : -100 / (d - 1);
+const amToDec = o => 1 + (o > 0 ? o / 100 : 100 / -o);
+const amToProb = o => o > 0 ? 100 / (o + 100) : -o / (-o + 100);
+const money = v => "$" + v.toFixed(2);
+const esc = s => String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const kLabel = () => ({ "0.25": "¼", "0.5": "½", "0.1": "1/10" }[S.kellyFrac] || S.kellyFrac);
+function toast(m) { const t = $("toast"); t.textContent = m; t.classList.add("show"); clearTimeout(toast.t); toast.t = setTimeout(() => t.classList.remove("show"), 2600); }
+function status(m, err) { $("status").textContent = m; $("status").classList.toggle("err", !!err); }
+
+// ---- dates (Eastern) ---------------------------------------------------------
+function todayET() {
+  const p = new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
+  return p; // YYYY-MM-DD
+}
+function windowUTC(dateStr) {
+  const noon = new Date(dateStr + "T12:00:00Z");
+  const off = (new Date(noon.toLocaleString("en-US", { timeZone: "UTC" })) - new Date(noon.toLocaleString("en-US", { timeZone: "America/New_York" }))) / 60000;
+  const start = new Date(Date.parse(dateStr + "T00:00:00Z") + off * 60000);
+  const end = new Date(start.getTime() + 24 * 3600 * 1000);
+  const f = d => d.toISOString().replace(/\.\d{3}Z$/, "Z");
+  return [f(start), f(end)];
+}
+const tipTime = iso => new Date(iso).toLocaleTimeString("en-US", { timeZone: "America/New_York", hour: "numeric", minute: "2-digit" }) + " ET";
+
+// ---- API -----------------------------------------------------------------------
+async function api(path, params) {
+  const key = $("apiKey").value.trim();
+  if (!key) throw new Error("Paste your Odds API key first.");
+  const qs = new URLSearchParams({ ...params, apiKey: key });
+  let res;
+  try { res = await fetch(`${API}${path}?${qs}`); }
+  catch (e) { throw new Error(location.protocol === "file:" ? "The browser blocked the request because this page was opened as a file. Open it with \"Open Parlay Builder.bat\" instead." : "Couldn't reach The Odds API. Check your connection."); }
+  const rem = res.headers.get("x-requests-remaining");
+  if (rem != null) { store.set("credits", { rem: Number(rem), at: Date.now() }); showCredits(); }
+  if (res.status === 401) throw new Error("The Odds API rejected that key. Check it and try again.");
+  if (res.status === 429) throw new Error("Out of Odds API credits for this month (or rate-limited).");
+  if (!res.ok) throw new Error(`The Odds API returned ${res.status}.`);
+  return res.json();
+}
+function showCredits() {
+  const c = store.get("credits");
+  $("creditPill").textContent = c ? `Credits left: ${c.rem}` : "Credits: –";
+  $("creditPill").classList.toggle("ok", !!c && c.rem > 50);
+}
+
+async function loadGames() {
+  const date = $("slateDate").value || todayET();
+  status("Loading games…");
+  try {
+    const [t0, t1] = windowUTC(date);
+    games = await api("/events", { commenceTimeFrom: t0, commenceTimeTo: t1 });
+    games.forEach(g => { g.home = abbr(g.home_team); g.away = abbr(g.away_team); });
+    games.sort((a, b) => a.commence_time.localeCompare(b.commence_time));
+    oddsCache = (store.get("odds") || {})[date] || {};
+    const now = Date.now();
+    picked = new Set(games.filter(g => Date.parse(g.commence_time) > now && !oddsCache[g.id]).map(g => g.id));
+    status(games.length ? "" : `No NBA games found for ${date}.`);
+    store.set("lastDate", date);
+    buildLegs(); renderGames(); render();
+  } catch (e) { status(e.message, true); }
+}
+
+async function pullProps() {
+  const date = $("slateDate").value || todayET();
+  const ids = [...picked];
+  if (!ids.length) return;
+  const markets = S.props.map(p => MARKETS[p]);
+  if (!markets.length) { status("Pick at least one prop type first.", true); return; }
+  $("pullBtn").disabled = true;
+  let done = 0;
+  for (const id of ids) {
+    status(`Pulling props… ${done}/${ids.length} games`);
+    try {
+      oddsCache[id] = await api(`/events/${id}/odds`, { regions: "us", markets: markets.join(","), oddsFormat: "american" });
+      oddsCache[id]._pulledAt = Date.now();
+      picked.delete(id); done++;
+      const all = store.get("odds") || {};
+      store.set("odds", { [date]: { ...(all[date] || {}), [id]: oddsCache[id] } });   // keep only today's
+    } catch (e) { status(e.message, true); break; }
+  }
+  if (done === ids.length) status(`Pulled ${done} game${done === 1 ? "" : "s"}.`);
+  buildLegs(); renderGames(); render();
+}
+
+// ---- turn odds into legs ---------------------------------------------------------
+function buildLegs() {
+  const out = [];
+  for (const g of games) {
+    const ev = oddsCache[g.id];
+    if (!ev) continue;
+    // (player, prop, point) -> book -> {over, under}
+    const grid = new Map();
+    for (const bm of ev.bookmakers || []) {
+      for (const mk of bm.markets || []) {
+        const prop = Object.keys(MARKETS).find(p => MARKETS[p] === mk.key);
+        if (!prop) continue;
+        for (const o of mk.outcomes || []) {
+          const side = (o.name || "").toLowerCase();
+          if (!o.description || o.point == null || (side !== "over" && side !== "under")) continue;
+          const k = `${o.description}|${prop}|${o.point}`;
+          if (!grid.has(k)) grid.set(k, { player: o.description, prop, point: o.point, books: {} });
+          const b = grid.get(k).books;
+          (b[bm.key] = b[bm.key] || {})[side] = o.price;
+        }
+      }
+    }
+    // main line at the user's book = its point closest to a coin flip
+    const mine = new Map();
+    for (const row of grid.values()) {
+      const p = row.books[S.book];
+      if (!p || p.over == null || p.under == null) continue;
+      const bal = Math.abs(amToProb(p.over) / (amToProb(p.over) + amToProb(p.under)) - 0.5);
+      const k = row.player + "|" + row.prop;
+      if (!mine.has(k) || bal < mine.get(k).bal) mine.set(k, { row, bal });
+    }
+    for (const { row } of mine.values()) {
+      const fair = [];
+      let bestO = null, bestU = null;
+      for (const [bk, p] of Object.entries(row.books)) {
+        if (p.over != null && p.under != null) {
+          const po = amToProb(p.over), pu = amToProb(p.under);
+          fair.push(po / (po + pu));
+        }
+        if (p.over != null && (!bestO || p.over > bestO.odds)) bestO = { odds: p.over, book: bk };
+        if (p.under != null && (!bestU || p.under > bestU.odds)) bestU = { odds: p.under, book: bk };
+      }
+      const fo = fair.reduce((a, b) => a + b, 0) / fair.length;
+      for (const side of ["over", "under"]) {
+        const odds = row.books[S.book][side];
+        const mp = side === "over" ? fo : 1 - fo;
+        const best = side === "over" ? bestO : bestU;
+        const L = { player: row.player, prop: row.prop, side, line: row.point, odds, dec: amToDec(odds), mp, push: 0,
+          mkt: amToProb(odds), nBooks: fair.length, gameId: g.id, home: g.home, away: g.away, tip: g.commence_time,
+          best, book: BOOK_NAME[S.book] || S.book };
+        L.edge = mp - L.mkt;
+        L.ev = mp * L.dec - 1;
+        L.id = [L.player, L.prop, L.side, L.line].join("|");
+        out.push(L);
+      }
+    }
+  }
+  legs = out.sort((a, b) => b.ev - a.ev);
+  slip = slip.filter(id => legs.some(l => l.id === id));
+}
+
+// ---- parlay math -------------------------------------------------------------------
+function parlayStats(ls) {
+  let p = 1, dec = 1, mkt = 1;
+  for (const l of ls) { p *= l.mp; dec *= l.dec; mkt *= l.mkt; }
+  const ev = p * dec - 1, b = dec - 1;
+  return { pAllWin: p, dec, am: decToAm(dec), ev, fairAm: decToAm(1 / p), impliedProb: 1 / dec, kelly: Math.max(0, (p * b - (1 - p)) / b) };
+}
+const eligible = l => S.props.includes(l.prop) && S.sides.includes(l.side) && l.nBooks >= Number(S.minBooks) &&
+  l.edge >= Number(S.minEdge) && l.mp >= Number(S.minProb);
+
+function suggest() {
+  const locked = legs.filter(l => legState[l.id] === "lock");
+  const pool = legs.filter(l => !legState[l.id] && eligible(l)).slice(0, Number(S.poolCap));
+  const maxGame = Number(S.maxGame);
+  const ok = (combo, l) => {
+    let same = 0;
+    for (const c of combo) {
+      if (c.player === l.player) return false;          // one leg per player
+      if (c.gameId === l.gameId) same++;
+    }
+    return same < maxGame;
+  };
+  for (let i = 0; i < locked.length; i++) if (!ok(locked.slice(0, i), locked[i])) return { conflict: true, list: [], evaluated: 0, pool: pool.length };
+  const sizes = S.upTo ? Array.from({ length: S.legs - 1 }, (_, i) => i + 2) : [S.legs];
+  const out = []; let evaluated = 0;
+  for (const k of sizes) {
+    const need = k - locked.length;
+    if (need < 0) continue;
+    const combo = [...locked];
+    const rec = (start, left) => {
+      if (!left) { evaluated++; out.push({ legs: [...combo], st: parlayStats(combo) }); return; }
+      for (let i = start; i <= pool.length - left; i++) {
+        if (!ok(combo, pool[i])) continue;
+        combo.push(pool[i]); rec(i + 1, left - 1); combo.pop();
+      }
+    };
+    rec(0, need);
+  }
+  const key = { ev: s => s.ev, prob: s => s.pAllWin, odds: s => s.dec }[S.rankBy];
+  out.sort((a, b) => key(b.st) - key(a.st));
+  return { list: out.slice(0, 12), evaluated, pool: pool.length };
+}
+
+// ---- rendering -------------------------------------------------------------------
+const pulledAt = id => { const t = oddsCache[id] && oddsCache[id]._pulledAt; return t ? new Date(t).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }) : ""; };
+const matchup = l => `${l.away} @ ${l.home}`;
+const legLabel = l => `${l.side === "over" ? "O" : "U"} ${l.line} ${PROP_LABEL[l.prop]}`;
+
+function renderControls() {
+  $("legBtns").innerHTML = [2, 3, 4, 5, 6].map(n => `<button type="button" data-n="${n}" aria-pressed="${S.legs === n}">${n}</button>`).join("");
+  $("legsUpTo").checked = S.upTo;
+  $("propChips").innerHTML = PROPS.map(p => `<label class="chip"><input type="checkbox" data-prop="${p}" ${S.props.includes(p) ? "checked" : ""}><span>${p[0].toUpperCase() + p.slice(1)}</span></label>`).join("");
+  $("sideChips").innerHTML = ["over", "under"].map(s => `<label class="chip"><input type="checkbox" data-side="${s}" ${S.sides.includes(s) ? "checked" : ""}><span>${s === "over" ? "Overs" : "Unders"}</span></label>`).join("");
+  for (const id of ["minEdge", "minProb", "maxGame", "rankBy", "minBooks", "poolCap", "kellyFrac", "book"]) $(id).value = S[id];
+  $("bankroll").value = S.bankroll;
+}
+
+function renderGames() {
+  const now = Date.now();
+  $("games").innerHTML = games.map(g => {
+    const started = Date.parse(g.commence_time) <= now, have = !!oddsCache[g.id];
+    return `<label class="game ${started && !have ? "done" : ""} ${have ? "pulled" : ""}">
+      <input type="checkbox" data-g="${g.id}" ${picked.has(g.id) ? "checked" : ""} ${started ? "disabled" : ""} aria-label="${have ? "Refresh" : "Pull"} ${g.away} at ${g.home}">
+      <span><span class="t">${g.away} @ ${g.home}</span><br><span class="s">${tipTime(g.commence_time)} · ${started ? (have ? "started · props kept" : "started") : have ? `loaded ${pulledAt(g.id)} · tick to refresh` : "not pulled"}</span></span></label>`;
+  }).join("");
+  $("games").querySelectorAll("[data-g]").forEach(c => c.onchange = () => { c.checked ? picked.add(c.dataset.g) : picked.delete(c.dataset.g); renderPullBtn(); });
+  const have = games.filter(g => oddsCache[g.id]).length;
+  $("slateMeta").textContent = games.length ? `${games.length} games · ${have} pulled` : "";
+  renderPullBtn();
+}
+function renderPullBtn() {
+  const cost = picked.size * S.props.length;
+  $("pullBtn").disabled = !picked.size || !S.props.length;
+  const refresh = [...picked].filter(id => oddsCache[id]).length;
+  $("pullBtn").textContent = picked.size ? `${refresh === picked.size ? "Refresh" : "Pull"} props for ${picked.size} game${picked.size === 1 ? "" : "s"} (${cost} credits)` : "Pull props";
+}
+
+const statBox = (k, v, cls = "") => `<div class="stat"><div class="k">${k}</div><div class="v ${cls}">${v}</div></div>`;
+
+function renderSuggestions() {
+  if (!legs.length) { $("suggMeta").textContent = ""; $("sugg").innerHTML = `<div class="empty">${games.length ? "Pick games above and pull their props." : "Paste your Odds API key and load today's games."}</div>`; return; }
+  const { list, evaluated, pool, conflict } = suggest();
+  const sizeTxt = S.upTo ? `2–${S.legs} legs` : `${S.legs} legs`;
+  $("suggMeta").textContent = conflict ? "" : `${sizeTxt} · ${pool} legs in the pool · ${evaluated.toLocaleString()} combinations checked`;
+  if (conflict) { $("sugg").innerHTML = `<div class="empty">Your locked legs break the one-per-player or per-game rule. Unlock one, or raise Max legs / game.</div>`; return; }
+  if (!list.length) { $("sugg").innerHTML = `<div class="empty">No ${sizeTxt} parlays fit. Only ${pool} legs pass your filters; try more props, lower minimums, more games, or fewer legs.</div>`; return; }
+  const bank = Number(S.bankroll) || 0, kf = Number(S.kellyFrac);
+  $("sugg").innerHTML = list.map((o, i) => { const s = o.st; return `<article class="combo">
+      <div class="top"><span class="rank">#${i + 1} · ${o.legs.length} legs</span><span class="odds">${fmtOdds(s.am)}</span></div>
+      <ul>${o.legs.map(l => `<li><span>${esc(l.player)} <b>${legLabel(l)}</b> <span class="p">${matchup(l)}</span></span><span class="p">${fmtOdds(l.odds)} · ${fmtPct(l.mp, 0)}</span></li>`).join("")}</ul>
+      <div class="stats">${statBox("Hit %", fmtPct(s.pAllWin))}${statBox("EV", (s.ev >= 0 ? "+" : "") + fmtPct(s.ev), s.ev >= 0 ? "pos" : "neg")}${statBox(kLabel() + " Kelly", money(bank * s.kelly * kf))}</div>
+      <button class="btn small" type="button" data-load="${i}">Put in slip</button></article>`; }).join("");
+  $("sugg").querySelectorAll("[data-load]").forEach(b => b.onclick = () => { slip = list[Number(b.dataset.load)].legs.map(l => l.id); render(); toast("Parlay moved to your slip"); });
+}
+
+function renderSlip() {
+  const ls = slip.map(id => legs.find(l => l.id === id)).filter(Boolean);
+  if (!ls.length) { $("slipLegs").innerHTML = `<div class="empty">Add legs with + in the pool, or choose “Put in slip” on a suggestion.</div>`; $("slipSum").innerHTML = ""; return; }
+  $("slipLegs").innerHTML = ls.map(l => `<div class="slip-leg"><div><div class="who">${esc(l.player)} <span class="what">${matchup(l)}</span></div><div class="what">${legLabel(l)} · fair ${fmtPct(l.mp)} vs book ${fmtPct(l.mkt)}</div></div><span class="num">${fmtOdds(l.odds)}</span><button class="btn small" type="button" data-rm="${esc(l.id)}" aria-label="Remove ${esc(l.player)}">✕</button></div>`).join("");
+  $("slipLegs").querySelectorAll("[data-rm]").forEach(b => b.onclick = () => { slip = slip.filter(x => x !== b.dataset.rm); render(); });
+  const s = parlayStats(ls);
+  const stake = Number(store.get("stake") ?? 10), ovr = store.get("ovr") ?? "";
+  const ovrDec = ovr !== "" && isFinite(Number(ovr)) && Number(ovr) !== 0 ? amToDec(Number(ovr)) : null;
+  const payDec = ovrDec ?? s.dec, ev = s.pAllWin * payDec - 1;
+  const games = {}; ls.forEach(l => games[l.gameId] = (games[l.gameId] || 0) + 1);
+  const warn = [];
+  if (Object.values(games).some(v => v > 1)) warn.push("Two or more legs come from the same game, so they're correlated and the hit % is less reliable.");
+  if (ls.length === 1) warn.push("One leg is a straight bet, not a parlay.");
+  const bank = Number(S.bankroll) || 0, kf = Number(S.kellyFrac);
+  $("slipSum").innerHTML = `
+    <div class="big"><div class="k">Parlay odds</div><div class="v">${fmtOdds(decToAm(payDec))}</div></div>
+    <div class="big"><div class="k">Fair odds</div><div class="v">${fmtOdds(s.fairAm)}</div></div>
+    <div class="big"><div class="k">Hit % (fair)</div><div class="v">${fmtPct(s.pAllWin)}</div></div>
+    <div class="big"><div class="k">Book's implied %</div><div class="v">${fmtPct(1 / payDec)}</div></div>
+    <div class="big"><div class="k">EV</div><div class="v ${ev >= 0 ? "pos" : "neg"}">${(ev >= 0 ? "+" : "") + fmtPct(ev)}</div></div>
+    <div class="big"><div class="k">${kLabel()} Kelly on $${bank}</div><div class="v">${money(bank * s.kelly * kf)}</div></div>
+    <div class="big"><div class="field"><label for="stakeIn">Stake ($)</label><input id="stakeIn" type="number" min="0" step="1" value="${stake}"></div></div>
+    <div class="big"><div class="field"><label for="ovrIn">Book's parlay odds (optional)</label><input id="ovrIn" type="text" inputmode="numeric" placeholder="${fmtOdds(s.am)}" value="${esc(ovr)}"></div></div>
+    <div class="big wide"><div class="k">To win · expected profit</div><div class="v">${money(stake * (payDec - 1))} · <span class="${ev >= 0 ? "pos" : "neg"}">${money(stake * ev)}</span></div></div>
+    ${warn.length ? `<div class="warnbox">${warn.join(" ")}</div>` : ""}`;
+  $("stakeIn").onchange = e => { store.set("stake", Number(e.target.value) || 0); renderSlip(); };
+  $("ovrIn").onchange = e => { store.set("ovr", e.target.value.trim()); renderSlip(); };
+}
+
+function renderPool() {
+  if (!legs.length) { $("poolBody").innerHTML = `<tr><td colspan="12">No props loaded yet.</td></tr>`; return; }
+  $("poolBody").innerHTML = legs.map((l, i) => {
+    const st = legState[l.id] || "", cls = st === "excl" ? "excluded" : st === "lock" ? "locked" : !eligible(l) ? "filtered" : "";
+    const bestTxt = l.best && l.best.odds > l.odds ? `${fmtOdds(l.best.odds)} ${esc(BOOK_NAME[l.best.book] || l.best.book)}` : "yours";
+    return `<tr class="${cls}"><td>${esc(l.player)}</td><td>${matchup(l)}</td><td>${PROP_LABEL[l.prop]}</td>
+      <td><span class="tag ${l.side}">${l.side}</span></td><td class="n">${l.line}</td><td class="n">${fmtOdds(l.odds)}</td>
+      <td class="n">${fmtPct(l.mp)}</td><td class="n">${l.nBooks}</td>
+      <td class="n ${l.edge >= 0 ? "pos" : "neg"}">${(l.edge >= 0 ? "+" : "") + (l.edge * 100).toFixed(1)}</td><td>${bestTxt}</td>
+      <td><span class="seg"><button type="button" class="lock" data-i="${i}" data-s="lock" aria-pressed="${st === "lock"}">Lock</button><button type="button" class="excl" data-i="${i}" data-s="excl" aria-pressed="${st === "excl"}">Exclude</button></span></td>
+      <td><button class="btn small" type="button" data-add="${i}" aria-label="Add ${esc(l.player)} to slip">${slip.includes(l.id) ? "✓" : "+"}</button></td></tr>`;
+  }).join("");
+  $("poolBody").querySelectorAll("[data-s]").forEach(b => b.onclick = () => { const l = legs[Number(b.dataset.i)]; legState[l.id] === b.dataset.s ? delete legState[l.id] : legState[l.id] = b.dataset.s; render(); });
+  $("poolBody").querySelectorAll("[data-add]").forEach(b => b.onclick = () => { const l = legs[Number(b.dataset.add)]; slip = slip.includes(l.id) ? slip.filter(x => x !== l.id) : [...slip, l.id]; render(); });
+}
+
+function render() { renderControls(); renderSuggestions(); renderSlip(); renderPool(); renderPullBtn(); store.set("settings", S); }
+
+// ---- events ------------------------------------------------------------------------
+document.querySelector(".rail").addEventListener("click", e => { const b = e.target.closest("[data-n]"); if (b) { S.legs = Number(b.dataset.n); render(); } });
+document.querySelector(".rail").addEventListener("change", e => {
+  const t = e.target;
+  if (t.dataset.prop) S.props = PROPS.filter(p => document.querySelector(`[data-prop="${p}"]`).checked);
+  else if (t.dataset.side) S.sides = ["over", "under"].filter(s => document.querySelector(`[data-side="${s}"]`).checked);
+  else if (t.id === "legsUpTo") S.upTo = t.checked;
+  else if (t.id === "bankroll") S.bankroll = Number(t.value) || 0;
+  else if (t.id in S) S[t.id] = t.value;
+  render();
+});
+$("book").innerHTML = BOOKS.map(([k, n]) => `<option value="${k}">${n}</option>`).join("");
+$("book").onchange = e => { S.book = e.target.value; buildLegs(); render(); };
+$("apiKey").value = store.get("key") || "";
+$("apiKey").onchange = e => store.set("key", e.target.value.trim());
+$("slateDate").value = todayET();
+$("loadGames").onclick = () => { store.set("key", $("apiKey").value.trim()); loadGames(); };
+$("pullBtn").onclick = pullProps;
+$("resetBtn").onclick = () => { S = { ...DEFAULTS, book: S.book }; legState = {}; render(); };
+$("clearSlip").onclick = () => { slip = []; render(); };
+$("copySlip").onclick = async () => {
+  const ls = slip.map(id => legs.find(l => l.id === id)).filter(Boolean);
+  if (!ls.length) { toast("Your slip is empty"); return; }
+  const s = parlayStats(ls);
+  const txt = `NBA ${ls.length}-leg parlay ${fmtOdds(s.am)} at ${BOOK_NAME[S.book]} (fair ${fmtPct(s.pAllWin)}, EV ${fmtPct(s.ev)})\n` + ls.map(l => `- ${l.player} (${matchup(l)}) ${legLabel(l)} ${fmtOdds(l.odds)}`).join("\n");
+  try { await navigator.clipboard.writeText(txt); toast("Slip copied"); } catch (e) { toast("Copy was blocked. Select the slip text by hand."); }
+};
+
+showCredits(); render();
+if ($("apiKey").value) loadGames();     // games list is free; props are only pulled on click
+})();
+</script>
+</body>
+</html>
