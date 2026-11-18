@@ -176,6 +176,18 @@ tr.hist td { white-space: normal; background: var(--bg); padding: 12px; }
 .hist-table { font-size: 12px; }
 .hist-table td, .hist-table th { padding: 3px 6px; }
 .res { font-weight: 600; } .res.hit { color: var(--good); } .res.miss { color: var(--bad); } .res.push { color: var(--muted); }
+.flag { color: var(--warn); margin-left: 4px; cursor: help; }
+.lx { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.lx.hi { color: var(--good); } .lx.lo { color: var(--bad); }
+.sec-head .pool-tools { display: flex; gap: 8px; align-items: center; font-size: 13px; color: var(--muted); }
+.sec-head .pool-tools select { width: auto; padding: 4px 8px; }
+.notes { grid-column: 1 / -1; display: flex; flex-direction: column; gap: 6px; }
+.note { background: var(--warn-soft); color: var(--warn); border-radius: 6px; padding: 6px 10px; font-size: 13px; }
+.matchup { grid-column: 1 / -1; border: 1px solid var(--line); border-radius: 6px; padding: 10px 12px; background: var(--panel); display: flex; flex-direction: column; gap: 4px; font-size: 13px; }
+.matchup .mh { display: flex; gap: 8px; align-items: center; font-weight: 600; }
+.mtag { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .03em; padding: 1px 7px; border-radius: 4px; }
+.mtag.fav { background: var(--good-soft); color: var(--good); } .mtag.tough { background: var(--bad-soft); color: var(--bad); } .mtag.neutral { background: var(--bg); color: var(--muted); border: 1px solid var(--line); }
+.matchup .row { color: var(--muted); } .matchup .row b { color: var(--ink); font-weight: 500; font-family: var(--font-mono); }
 .payline { font-family: var(--font-mono); font-size: 13px; color: var(--muted); }
 .payline b { color: var(--ink); font-weight: 500; }
 </style>
@@ -236,6 +248,15 @@ tr.hist td { white-space: normal; background: var(--bg); padding: 12px; }
           </div>
         </div>
         <div class="row2">
+          <div class="field">
+            <label for="minL10">Min L10 hit % / leg</label>
+            <select id="minL10"><option value="0">Any</option><option value="0.5">50%</option><option value="0.6">60%</option><option value="0.7">70%</option><option value="0.8">80%</option></select>
+          </div>
+          <div class="field" style="justify-content:end">
+            <label style="display:flex;gap:6px;align-items:center;font-size:13px;text-transform:none;letter-spacing:0;font-weight:400;color:var(--ink)"><input type="checkbox" id="skipFlagged"> Skip ⚠ flagged players</label>
+          </div>
+        </div>
+        <div class="row2">
           <div class="field"><label for="bankroll">Bankroll ($)</label><input type="number" id="bankroll" min="0" step="10"></div>
           <div class="field"><label for="kellyFrac">Kelly fraction</label><select id="kellyFrac"><option value="0.1">1/10</option><option value="0.25">1/4</option><option value="0.5">1/2</option></select></div>
         </div>
@@ -273,9 +294,11 @@ tr.hist td { white-space: normal; background: var(--bg); padding: 12px; }
     </section>
 
     <section class="card" aria-labelledby="poolH">
-      <div class="sec-head"><h2 id="poolH">Leg pool</h2><span class="meta">Tap a leg to see the player's last 5 and 10 games against the line. Fair % is the average no-vig probability across books. Lock puts a leg in every suggestion, Exclude drops it, + adds it to your slip.</span></div>
+      <div class="sec-head"><h2 id="poolH">Leg pool</h2>
+        <div class="pool-tools"><label for="poolSort">Sort by</label><select id="poolSort"><option value="ev">EV</option><option value="edge">Edge</option><option value="fair">Fair %</option><option value="l5">L5 hit %</option><option value="l10">L10 hit %</option><option value="odds">Odds</option></select></div>
+        <span class="meta">L5 and L10 count how often the leg would have hit in the player's last 5 and 10 games; ⚠ marks a player who missed recent games or is losing minutes. Tap a leg to see the player's last 5 and 10 games against the line. Fair % is the average no-vig probability across books. Lock puts a leg in every suggestion, Exclude drops it, + adds it to your slip.</span></div>
       <div class="tablewrap"><table>
-        <thead><tr><th>Player</th><th>Game</th><th>Prop</th><th>Side</th><th class="n">Line</th><th class="n">Your odds</th><th class="n">Fair %</th><th class="n">Books</th><th class="n">Edge</th><th>Best price</th><th>Suggest</th><th></th></tr></thead>
+        <thead><tr><th>Player</th><th>Game</th><th>Prop</th><th>Side</th><th class="n">Line</th><th class="n">Your odds</th><th class="n">Fair %</th><th class="n">Books</th><th class="n">Edge</th><th class="n">L5</th><th class="n">L10</th><th>Best price</th><th>Suggest</th><th></th></tr></thead>
         <tbody id="poolBody"></tbody>
       </table></div>
     </section>
@@ -298,7 +321,8 @@ const TEAM = { "Atlanta Hawks":"ATL","Boston Celtics":"BOS","Brooklyn Nets":"BKN
 const abbr = n => TEAM[n] || (n || "").split(" ").pop().slice(0, 3).toUpperCase();
 
 const DEFAULTS = { legs: 3, upTo: false, props: [...PROPS], sides: ["over", "under"], minEdge: "-1", minProb: "0",
-  maxGame: "1", rankBy: "ev", minBooks: "3", poolCap: "25", bankroll: 500, kellyFrac: "0.25", book: "draftkings", wager: 10 };
+  maxGame: "1", rankBy: "ev", minBooks: "3", poolCap: "25", bankroll: 500, kellyFrac: "0.25", book: "draftkings", wager: 10,
+  minL10: "0", skipFlagged: false, poolSort: "ev" };
 const store = {
   get(k) { try { return JSON.parse(localStorage.getItem("nbaSlate." + k)); } catch (e) { return null; } },
   set(k, v) { try { localStorage.setItem("nbaSlate." + k, JSON.stringify(v)); } catch (e) {} }
@@ -455,6 +479,7 @@ function buildLegs() {
     }
   }
   legs = out.sort((a, b) => b.ev - a.ev);
+  infoCache.clear();
   slip = slip.filter(id => legs.some(l => l.id === id));
 }
 
@@ -465,8 +490,15 @@ function parlayStats(ls) {
   const ev = p * dec - 1, b = dec - 1;
   return { pAllWin: p, dec, am: decToAm(dec), ev, fairAm: decToAm(1 / p), impliedProb: 1 / dec, kelly: Math.max(0, (p * b - (1 - p)) / b) };
 }
-const eligible = l => S.props.includes(l.prop) && S.sides.includes(l.side) && l.nBooks >= Number(S.minBooks) &&
-  l.edge >= Number(S.minEdge) && l.mp >= Number(S.minProb);
+const eligible = l => {
+  if (!(S.props.includes(l.prop) && S.sides.includes(l.side) && l.nBooks >= Number(S.minBooks) &&
+    l.edge >= Number(S.minEdge) && l.mp >= Number(S.minProb))) return false;
+  if (!statsState.loaded) return true;                 // history filters apply once stats load
+  const info = legInfo(l);
+  if (Number(S.minL10) > 0 && !(info.l10 && info.l10.n >= 5 && info.l10.h / info.l10.n >= Number(S.minL10))) return false;
+  if (S.skipFlagged && info.flags.length) return false;
+  return true;
+};
 
 function suggest() {
   const locked = legs.filter(l => legState[l.id] === "lock");
@@ -511,7 +543,8 @@ function renderControls() {
   $("legsUpTo").checked = S.upTo;
   $("propChips").innerHTML = PROPS.map(p => `<label class="chip"><input type="checkbox" data-prop="${p}" ${S.props.includes(p) ? "checked" : ""}><span>${p[0].toUpperCase() + p.slice(1)}</span></label>`).join("");
   $("sideChips").innerHTML = ["over", "under"].map(s => `<label class="chip"><input type="checkbox" data-side="${s}" ${S.sides.includes(s) ? "checked" : ""}><span>${s === "over" ? "Overs" : "Unders"}</span></label>`).join("");
-  for (const id of ["minEdge", "minProb", "maxGame", "rankBy", "minBooks", "poolCap", "kellyFrac", "book"]) $(id).value = S[id];
+  for (const id of ["minEdge", "minProb", "maxGame", "rankBy", "minBooks", "poolCap", "kellyFrac", "book", "minL10", "poolSort"]) $(id).value = S[id];
+  $("skipFlagged").checked = !!S.skipFlagged;
   $("bankroll").value = S.bankroll;
   if (document.activeElement !== $("wager")) $("wager").value = S.wager;
 }
@@ -549,7 +582,7 @@ function renderSuggestions() {
   const bank = Number(S.bankroll) || 0, kf = Number(S.kellyFrac);
   $("sugg").innerHTML = list.map((o, i) => { const s = o.st; return `<article class="combo">
       <div class="top"><span class="rank">#${i + 1} · ${o.legs.length} legs</span><span class="odds">${fmtOdds(s.am)}</span></div>
-      <ul>${o.legs.map(l => `<li><span>${esc(l.player)} <b>${legLabel(l)}</b> <span class="p">${matchup(l)}</span></span><span class="p">${fmtOdds(l.odds)} · ${fmtPct(l.mp, 0)}</span></li>`).join("")}</ul>
+      <ul>${o.legs.map(l => `<li><span>${esc(l.player)}${flagIcon(legInfo(l))} <b>${legLabel(l)}</b> <span class="p">${matchup(l)}</span></span><span class="p">${fmtOdds(l.odds)} · ${fmtPct(l.mp, 0)}</span></li>`).join("")}</ul>
       <div class="payline">$${fmtMoneyShort(S.wager)} to win <b>${money(S.wager * (s.dec - 1))}</b> · payout ${money(S.wager * s.dec)}</div>
       <div class="stats">${statBox("Hit %", fmtPct(s.pAllWin))}${statBox("EV", (s.ev >= 0 ? "+" : "") + fmtPct(s.ev), s.ev >= 0 ? "pos" : "neg")}${statBox(kLabel() + " Kelly", money(bank * s.kelly * kf))}</div>
       <button class="btn small" type="button" data-load="${i}">Put in slip</button></article>`; }).join("");
@@ -559,7 +592,7 @@ function renderSuggestions() {
 function renderSlip() {
   const ls = slip.map(id => legs.find(l => l.id === id)).filter(Boolean);
   if (!ls.length) { $("slipLegs").innerHTML = `<div class="empty">Add legs with + in the pool, or choose “Put in slip” on a suggestion.</div>`; $("slipSum").innerHTML = ""; return; }
-  $("slipLegs").innerHTML = ls.map(l => `<div class="slip-leg"><div><div class="who">${esc(l.player)} <span class="what">${matchup(l)}</span></div><div class="what">${legLabel(l)} · fair ${fmtPct(l.mp)} vs book ${fmtPct(l.mkt)}</div></div><span class="num">${fmtOdds(l.odds)}</span><button class="btn small" type="button" data-rm="${esc(l.id)}" aria-label="Remove ${esc(l.player)}">✕</button></div>`).join("");
+  $("slipLegs").innerHTML = ls.map(l => `<div class="slip-leg"><div><div class="who">${esc(l.player)}${flagIcon(legInfo(l))} <span class="what">${matchup(l)}</span></div><div class="what">${legLabel(l)} · fair ${fmtPct(l.mp)} vs book ${fmtPct(l.mkt)}</div></div><span class="num">${fmtOdds(l.odds)}</span><button class="btn small" type="button" data-rm="${esc(l.id)}" aria-label="Remove ${esc(l.player)}">✕</button></div>`).join("");
   $("slipLegs").querySelectorAll("[data-rm]").forEach(b => b.onclick = () => { slip = slip.filter(x => x !== b.dataset.rm); render(); });
   const s = parlayStats(ls);
   const stake = Number(S.wager) || 0, ovr = store.get("ovr") ?? "";
@@ -586,33 +619,39 @@ function renderSlip() {
 }
 
 function renderPool() {
-  if (!legs.length) { $("poolBody").innerHTML = `<tr><td colspan="12">No props loaded yet.</td></tr>`; return; }
+  if (!legs.length) { $("poolBody").innerHTML = `<tr><td colspan="14">No props loaded yet.</td></tr>`; return; }
   if (openLeg && !legs.some(l => l.id === openLeg)) openLeg = null;
-  $("poolBody").innerHTML = legs.map((l, i) => {
+  const lrate = x => x && x.n ? x.h / x.n : -1;
+  const sorters = { ev: (a, b) => b.ev - a.ev, edge: (a, b) => b.edge - a.edge, fair: (a, b) => b.mp - a.mp, odds: (a, b) => b.dec - a.dec,
+    l5: (a, b) => lrate(legInfo(b).l5) - lrate(legInfo(a).l5) || b.ev - a.ev, l10: (a, b) => lrate(legInfo(b).l10) - lrate(legInfo(a).l10) || b.ev - a.ev };
+  const shown = legs.slice().sort(sorters[S.poolSort] || sorters.ev);
+  const lcell = x => !x || !x.n ? `<td class="n lx">–</td>` : `<td class="n lx ${x.h / x.n >= 0.6 ? "hi" : x.h / x.n <= 0.4 ? "lo" : ""}">${x.h}/${x.n}</td>`;
+  $("poolBody").innerHTML = shown.map(l => {
+    const i = l.id, info = legInfo(l);
     const st = legState[l.id] || "", cls = st === "excl" ? "excluded" : st === "lock" ? "locked" : !eligible(l) ? "filtered" : "";
     const bestTxt = l.best && l.best.odds > l.odds ? `${fmtOdds(l.best.odds)} ${esc(BOOK_NAME[l.best.book] || l.best.book)}` : "yours";
     const open = openLeg === l.id;
-    return `<tr class="leg ${cls} ${open ? "open" : ""}" data-row="${i}" tabindex="0" aria-expanded="${open}"><td><span class="caret">${open ? "▾" : "▸"}</span>${esc(l.player)}</td><td>${matchup(l)}</td><td>${PROP_LABEL[l.prop]}</td>
+    return `<tr class="leg ${cls} ${open ? "open" : ""}" data-row="${esc(i)}" tabindex="0" aria-expanded="${open}"><td><span class="caret">${open ? "▾" : "▸"}</span>${esc(l.player)}${flagIcon(info)}</td><td>${matchup(l)}</td><td>${PROP_LABEL[l.prop]}</td>
       <td><span class="tag ${l.side}">${l.side}</span></td><td class="n">${l.line}</td><td class="n">${fmtOdds(l.odds)}</td>
       <td class="n">${fmtPct(l.mp)}</td><td class="n">${l.nBooks}</td>
-      <td class="n ${l.edge >= 0 ? "pos" : "neg"}">${(l.edge >= 0 ? "+" : "") + (l.edge * 100).toFixed(1)}</td><td>${bestTxt}</td>
-      <td><span class="seg"><button type="button" class="lock" data-i="${i}" data-s="lock" aria-pressed="${st === "lock"}">Lock</button><button type="button" class="excl" data-i="${i}" data-s="excl" aria-pressed="${st === "excl"}">Exclude</button></span></td>
-      <td><button class="btn small" type="button" data-add="${i}" aria-label="Add ${esc(l.player)} to slip">${slip.includes(l.id) ? "✓" : "+"}</button></td></tr>` +
-      (open ? `<tr class="hist"><td colspan="12">${historyHTML(l)}</td></tr>` : "");
+      <td class="n ${l.edge >= 0 ? "pos" : "neg"}">${(l.edge >= 0 ? "+" : "") + (l.edge * 100).toFixed(1)}</td>${lcell(info.l5)}${lcell(info.l10)}<td>${bestTxt}</td>
+      <td><span class="seg"><button type="button" class="lock" data-i="${esc(i)}" data-s="lock" aria-pressed="${st === "lock"}">Lock</button><button type="button" class="excl" data-i="${esc(i)}" data-s="excl" aria-pressed="${st === "excl"}">Exclude</button></span></td>
+      <td><button class="btn small" type="button" data-add="${esc(i)}" aria-label="Add ${esc(l.player)} to slip">${slip.includes(l.id) ? "✓" : "+"}</button></td></tr>` +
+      (open ? `<tr class="hist"><td colspan="14">${historyHTML(l)}</td></tr>` : "");
   }).join("");
   $("poolBody").querySelectorAll("tr.leg").forEach(tr => {
     const toggle = e => {
       if (e.target.closest("button")) return;
-      const l = legs[Number(tr.dataset.row)];
+      const l = legs.find(x => x.id === tr.dataset.row);
       openLeg = openLeg === l.id ? null : l.id;
       renderPool();
-      if (openLeg && !statsState.loaded && !statsState.loading) loadStats();
+      if (openLeg && !statsState.loaded && !statsState.loading) loadStats();   // retry after an error
     };
     tr.onclick = toggle;
     tr.onkeydown = e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggle(e); } };
   });
-  $("poolBody").querySelectorAll("[data-s]").forEach(b => b.onclick = () => { const l = legs[Number(b.dataset.i)]; legState[l.id] === b.dataset.s ? delete legState[l.id] : legState[l.id] = b.dataset.s; render(); });
-  $("poolBody").querySelectorAll("[data-add]").forEach(b => b.onclick = () => { const l = legs[Number(b.dataset.add)]; slip = slip.includes(l.id) ? slip.filter(x => x !== l.id) : [...slip, l.id]; render(); });
+  $("poolBody").querySelectorAll("[data-s]").forEach(b => b.onclick = () => { const l = legs.find(x => x.id === b.dataset.i); legState[l.id] === b.dataset.s ? delete legState[l.id] : legState[l.id] = b.dataset.s; render(); });
+  $("poolBody").querySelectorAll("[data-add]").forEach(b => b.onclick = () => { const l = legs.find(x => x.id === b.dataset.add); slip = slip.includes(l.id) ? slip.filter(x => x !== l.id) : [...slip, l.id]; render(); });
 }
 
 // ---- player history (data/player_logs.json, refreshed nightly by a GitHub Action) ----
@@ -639,12 +678,93 @@ async function loadStats() {
       if (!statsState.byLast.has(last)) statsState.byLast.set(last, []);
       statsState.byLast.get(last).push(pid);
     }
+    computeDerived();
     statsState.loaded = true;
+    infoCache.clear();
   } catch (e) {
     statsState.error = e.message && !/Failed to fetch|NetworkError|Load failed/.test(e.message) ? e.message : "Couldn't reach the stats file. Check your connection.";
   }
   statsState.loading = false;
-  if (openLeg) renderPool();
+  render();
+}
+
+// Team schedules (dates played) and what each defense allowed, from the box scores
+const infoCache = new Map();
+const derived = { teamDates: new Map(), allowed: new Map(), ranks: new Map() };
+const STAT_IDX = { points: 0, rebounds: 1, assists: 2, threes: 3 };
+function computeDerived() {
+  const games = new Map();                       // "DEF|gid" -> {def, date, tot:[4], G:[4], F:[4], C:[4]}
+  derived.teamDates.clear(); derived.allowed.clear(); derived.ranks.clear();
+  for (const p of Object.values(statsState.players)) {
+    for (const r of p.g) {
+      const team = r[9] || p.t;
+      if (!derived.teamDates.has(team)) derived.teamDates.set(team, new Set());
+      derived.teamDates.get(team).add(r[0]);
+      const k = r[1] + "|" + r[8];
+      if (!games.has(k)) games.set(k, { def: r[1], date: r[0], tot: [0, 0, 0, 0], G: [0, 0, 0, 0], F: [0, 0, 0, 0], C: [0, 0, 0, 0] });
+      const gm = games.get(k), vals = [r[4], r[5], r[6], r[7]];
+      vals.forEach((v, j) => { gm.tot[j] += v; if (p.p && gm[p.p]) gm[p.p][j] += v; });
+    }
+  }
+  const byDef = new Map();
+  for (const gm of games.values()) { if (!byDef.has(gm.def)) byDef.set(gm.def, []); byDef.get(gm.def).push(gm); }
+  for (const [def, gs] of byDef) {
+    const last = gs.sort((a, b) => b.date.localeCompare(a.date)).slice(0, 10);
+    const avg = key => [0, 1, 2, 3].map(j => last.reduce((a, g) => a + g[key][j], 0) / last.length);
+    derived.allowed.set(def, { n: last.length, tot: avg("tot"), G: avg("G"), F: avg("F"), C: avg("C") });
+  }
+  for (const key of ["tot", "G", "F", "C"]) for (let j = 0; j < 4; j++) {
+    const order = [...derived.allowed.entries()].filter(([, a]) => a.n >= 5).sort((a, b) => b[1][key][j] - a[1][key][j]).map(([t]) => t);
+    order.forEach((t, i) => derived.ranks.set(`${t}|${key}|${j}`, { rank: i + 1, of: order.length }));
+  }
+}
+
+const avgOf = (gs, c) => gs.reduce((a, r) => a + r[c], 0) / gs.length;
+function legInfo(l) {
+  if (!statsState.loaded) return { flags: [] };
+  if (infoCache.has(l.id)) return infoCache.get(l.id);
+  const p = findPlayer(l), info = { p, flags: [] };
+  if (p && p.g.length) {
+    const col = STAT_COL[l.prop];
+    const hits = gs => ({ h: gs.filter(r => legResult(r[col], l) === "hit").length, n: gs.length });
+    info.l5 = hits(p.g.slice(0, 5)); info.l10 = hits(p.g.slice(0, 10));
+    const dates = derived.teamDates.get(p.t);
+    const missed = dates ? [...dates].filter(d => d > p.g[0][0]).length : 0;
+    if (missed) info.flags.push(`Missed ${p.t}'s last ${missed === 1 ? "game" : missed + " games"} (last played ${p.g[0][0].slice(5).replace("-", "/")}). Check the injury report.`);
+    if (p.g.length >= 6) {
+      const last3 = avgOf(p.g.slice(0, 3), 3), prior = avgOf(p.g.slice(3, 10), 3);
+      if (prior >= 15 && last3 < prior * 0.7) info.flags.push(`Minutes down: ${last3.toFixed(0)} per game over his last 3, versus ${prior.toFixed(0)} before that.`);
+    }
+  }
+  infoCache.set(l.id, info);
+  return info;
+}
+const flagIcon = info => info.flags && info.flags.length ? ` <span class="flag" title="${esc(info.flags.join(" "))}" aria-label="Warning: ${esc(info.flags.join(" "))}">⚠</span>` : "";
+const ordinal = n => n + (["th", "st", "nd", "rd"][(n % 100 > 10 && n % 100 < 14) ? 0 : Math.min(n % 10, 4) % 4] || "th");
+const BUCKET_NAME = { G: "guards", F: "forwards", C: "centers" };
+
+function matchupHTML(l, p) {
+  const opp = p.t === l.home ? l.away : p.t === l.away ? l.home : null;
+  if (!opp || !derived.allowed.has(opp)) return "";
+  const a = derived.allowed.get(opp), j = STAT_IDX[l.prop], lab = PROP_LABEL[l.prop];
+  const totRank = derived.ranks.get(`${opp}|tot|${j}`);
+  const posRank = p.p ? derived.ranks.get(`${opp}|${p.p}|${j}`) : null;
+  const r = posRank || totRank;
+  let tag = "";
+  if (r) {
+    const third = r.of / 3, favOver = r.rank <= third, toughOver = r.rank > r.of - third;
+    const fav = l.side === "over" ? favOver : toughOver, tough = l.side === "over" ? toughOver : favOver;
+    tag = fav ? `<span class="mtag fav">Favorable for the ${l.side}</span>` : tough ? `<span class="mtag tough">Tough for the ${l.side}</span>` : `<span class="mtag neutral">Neutral</span>`;
+  }
+  const rk = x => x ? ` · ${ordinal(x.rank)} most of ${x.of}` : "";
+  const vs = p.g.filter(g => g[1] === opp);
+  const vsTxt = vs.length ? vs.map(g => `<b>${g[STAT_COL[l.prop]]}</b> (${g[0].slice(5).replace("-", "/")})`).join(", ") : "no meetings yet";
+  return `<div class="matchup">
+    <div class="mh">Matchup vs ${esc(opp)} defense ${tag}</div>
+    <div class="row">${esc(opp)} allows <b>${a.tot[j].toFixed(1)}</b> ${lab} per game${rk(totRank)} (last ${a.n} games)</div>
+    ${p.p && posRank ? `<div class="row">To ${BUCKET_NAME[p.p]}: <b>${a[p.p][j].toFixed(1)}</b> ${lab} per game${rk(posRank)}</div>` : ""}
+    <div class="row">${esc(l.player.split(" ").slice(-1)[0])} vs ${esc(opp)} this season: ${vsTxt}</div>
+  </div>`;
 }
 
 function findPlayer(l) {
@@ -685,9 +805,12 @@ function historyHTML(l) {
   };
   const upd = statsState.updated ? `<div class="sub" style="grid-column:1/-1">Stats through ${esc(p.g[0][0])} · updated ${new Date(statsState.updated).toLocaleDateString("en-US", { month: "short", day: "numeric" })}</div>` : "";
   const rows = g10.map(r => { const res = legResult(r[col], l); return `<tr><td>${r[0].slice(5).replace("-", "/")}</td><td>${r[2] ? "vs" : "@"} ${esc(r[1])}</td><td class="n">${Math.round(r[3])}</td><td class="n">${r[col]}</td><td class="res ${res}">${res === "hit" ? "✓" : res === "miss" ? "✗" : "push"}</td></tr>`; }).join("");
-  return `<div class="hist-wrap">${head}
+  const info = legInfo(l);
+  const notes = info.flags.length ? `<div class="notes">${info.flags.map(f => `<div class="note">⚠ ${esc(f)}</div>`).join("")}</div>` : "";
+  return `<div class="hist-wrap">${head}${notes}
     <div class="hit-tiles">${tile("Last 5", g5)}${tile("Last 10", g10)}${upd}</div>
     <div class="hist-chart">${histChart(g10.slice().reverse(), col, l)}</div>
+    ${matchupHTML(l, p)}
     <div class="tablewrap" style="grid-column:1/-1"><table class="hist-table"><thead><tr><th>Date</th><th>Opp</th><th class="n">Min</th><th class="n">${PROP_LABEL[l.prop]}</th><th>${l.side === "over" ? "Over" : "Under"} ${l.line}</th></tr></thead><tbody>${rows}</tbody></table></div>
   </div>`;
 }
@@ -726,9 +849,11 @@ document.querySelector(".rail").addEventListener("change", e => {
   else if (t.id === "legsUpTo") S.upTo = t.checked;
   else if (t.id === "bankroll") S.bankroll = Number(t.value) || 0;
   else if (t.id === "wager") S.wager = Math.max(0, Number(t.value) || 0);
+  else if (t.id === "skipFlagged") S.skipFlagged = t.checked;
   else if (t.id in S) S[t.id] = t.value;
   render();
 });
+$("poolSort").onchange = e => { S.poolSort = e.target.value; render(); };
 $("book").innerHTML = BOOKS.map(([k, n]) => `<option value="${k}">${n}</option>`).join("");
 $("book").onchange = e => { S.book = e.target.value; buildLegs(); render(); };
 $("apiKey").value = store.get("key") || "";
@@ -747,6 +872,7 @@ $("copySlip").onclick = async () => {
 };
 
 showCredits(); render();
+loadStats();                            // player history: free, same file for everyone
 if ($("apiKey").value) loadGames();     // games list is free; props are only pulled on click
 })();
 </script>

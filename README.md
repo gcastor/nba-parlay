@@ -12,6 +12,9 @@ A mobile-friendly web app that loads today's NBA slate, pulls live player-prop o
 - **Suggests parlays:** searches every allowed combination of the best legs and ranks them by expected value, hit probability or payout.
 - **Gives you manual control:** number of legs, prop types, overs/unders, minimum edge, minimum hit %, minimum books, max legs per game, and lock/exclude on individual legs.
 - **Shows player history:** tap any leg to see the player's last 5 and last 10 games against tonight's line, with hit rate, average, a bar chart and a game log.
+- **Flags availability risks:** a ⚠ marks players who missed their team's last game(s) or whose minutes fell sharply over their last 3 games.
+- **Scans recent form:** L5 and L10 hit-rate columns in the leg pool, a sort by L5/L10, a "Min L10 hit %" filter, and an option to skip flagged players.
+- **Adds matchup context:** what tonight's opponent allowed in that stat over its last 10 games, overall and to the player's position (guard, forward or center), with a league rank and a favorable/neutral/tough tag, plus the player's results against that team this season.
 - **Shows payouts:** set a wager once, and every suggested parlay shows what it pays.
 - **Builds the slip:** combined odds, fair odds, hit %, book's implied %, EV, payout for your stake, and a Kelly stake suggestion.
 - **Shops lines:** shows when another book pays more on the same leg.
@@ -72,7 +75,7 @@ A stake of $0 means the parlay has no edge at that price.
 | Front end | One HTML file: vanilla JavaScript and CSS, no framework or build step |
 | Data | [The Odds API v4](https://the-odds-api.com/): `/sports/basketball_nba/events` and `/events/{id}/odds` (`regions=us`, player prop markets) |
 | Hosting | GitHub Pages |
-| Player stats | GitHub Action (`.github/workflows/update-stats.yml`) runs nightly at 4:30 AM ET: `scripts/update_stats.py` pulls finished box scores from ESPN's public site API into `data/player_logs.json` (last 25 games per player), and the app reads that file directly |
+| Player stats | GitHub Action (`.github/workflows/update-stats.yml`) runs nightly at 4:30 AM ET: `scripts/update_stats.py` pulls finished box scores from ESPN's public site API into `data/player_logs.json` (last 25 games per player, with team and position). The app derives team schedules, availability flags and defense-vs-position numbers from that file, and the app reads that file directly |
 | State | Browser `localStorage`: API key, settings, and the day's pulled odds |
 | Layout | Responsive CSS grid; stacks to one column on phones; light and dark themes |
 
