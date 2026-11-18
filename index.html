@@ -212,6 +212,7 @@ tr.hist td { white-space: normal; background: var(--bg); padding: 12px; }
       <div class="legcount" role="group" aria-labelledby="legsLbl" id="legBtns"></div>
       <label style="display:flex;gap:6px;align-items:center;font-size:13px"><input type="checkbox" id="legsUpTo"> Also show smaller parlays (2 up to this many legs)</label>
     </div>
+    <div class="field" id="gameField" hidden><span class="lbl">Games</span><div class="chips" id="gameChips"></div></div>
     <div class="field"><span class="lbl">Props to include</span><div class="chips" id="propChips"></div></div>
     <div class="field"><span class="lbl">Sides</span><div class="chips" id="sideChips"></div></div>
     <div class="row2">
@@ -491,6 +492,7 @@ function parlayStats(ls) {
   return { pAllWin: p, dec, am: decToAm(dec), ev, fairAm: decToAm(1 / p), impliedProb: 1 / dec, kelly: Math.max(0, (p * b - (1 - p)) / b) };
 }
 const eligible = l => {
+  if (gameSel.size && !gameSel.has(l.gameId)) return false;
   if (!(S.props.includes(l.prop) && S.sides.includes(l.side) && l.nBooks >= Number(S.minBooks) &&
     l.edge >= Number(S.minEdge) && l.mp >= Number(S.minProb))) return false;
   if (!statsState.loaded) return true;                 // history filters apply once stats load
@@ -538,7 +540,17 @@ const pulledAt = id => { const t = oddsCache[id] && oddsCache[id]._pulledAt; ret
 const matchup = l => `${l.away} @ ${l.home}`;
 const legLabel = l => `${l.side === "over" ? "O" : "U"} ${l.line} ${PROP_LABEL[l.prop]}`;
 
+// Game filter: empty set = all games. Not saved, since game ids change daily.
+const gameSel = new Set();
+function renderGameChips() {
+  const pulled = games.filter(g => oddsCache[g.id]);
+  for (const id of [...gameSel]) if (!pulled.some(g => g.id === id)) gameSel.delete(id);
+  $("gameField").hidden = pulled.length < 2;
+  $("gameChips").innerHTML = `<label class="chip"><input type="checkbox" data-gall="1" ${gameSel.size ? "" : "checked"}><span>All</span></label>` +
+    pulled.map(g => `<label class="chip"><input type="checkbox" data-game="${g.id}" ${gameSel.has(g.id) ? "checked" : ""}><span>${g.away} @ ${g.home}</span></label>`).join("");
+}
 function renderControls() {
+  renderGameChips();
   $("legBtns").innerHTML = [2, 3, 4, 5, 6].map(n => `<button type="button" data-n="${n}" aria-pressed="${S.legs === n}">${n}</button>`).join("");
   $("legsUpTo").checked = S.upTo;
   $("propChips").innerHTML = PROPS.map(p => `<label class="chip"><input type="checkbox" data-prop="${p}" ${S.props.includes(p) ? "checked" : ""}><span>${p[0].toUpperCase() + p.slice(1)}</span></label>`).join("");
@@ -578,6 +590,7 @@ function renderSuggestions() {
   const sizeTxt = S.upTo ? `2–${S.legs} legs` : `${S.legs} legs`;
   $("suggMeta").textContent = conflict ? "" : `${sizeTxt} · ${pool} legs in the pool · ${evaluated.toLocaleString()} combinations checked`;
   if (conflict) { $("sugg").innerHTML = `<div class="empty">Your locked legs break the one-per-player or per-game rule. Unlock one, or raise Max legs / game.</div>`; return; }
+  if (!list.length && gameSel.size === 1 && Number(S.maxGame) < 2) { $("sugg").innerHTML = `<div class="empty">You picked one game, and Max legs / game is 1. Raise it to 2 or "No limit" to build a same-game parlay, or pick more games.</div>`; return; }
   if (!list.length) { $("sugg").innerHTML = `<div class="empty">No ${sizeTxt} parlays fit. Only ${pool} legs pass your filters; try more props, lower minimums, more games, or fewer legs.</div>`; return; }
   const bank = Number(S.bankroll) || 0, kf = Number(S.kellyFrac);
   $("sugg").innerHTML = list.map((o, i) => { const s = o.st; return `<article class="combo">
@@ -624,7 +637,7 @@ function renderPool() {
   const lrate = x => x && x.n ? x.h / x.n : -1;
   const sorters = { ev: (a, b) => b.ev - a.ev, edge: (a, b) => b.edge - a.edge, fair: (a, b) => b.mp - a.mp, odds: (a, b) => b.dec - a.dec,
     l5: (a, b) => lrate(legInfo(b).l5) - lrate(legInfo(a).l5) || b.ev - a.ev, l10: (a, b) => lrate(legInfo(b).l10) - lrate(legInfo(a).l10) || b.ev - a.ev };
-  const shown = legs.slice().sort(sorters[S.poolSort] || sorters.ev);
+  const shown = legs.filter(l => !gameSel.size || gameSel.has(l.gameId)).sort(sorters[S.poolSort] || sorters.ev);
   const lcell = x => !x || !x.n ? `<td class="n lx">–</td>` : `<td class="n lx ${x.h / x.n >= 0.6 ? "hi" : x.h / x.n <= 0.4 ? "lo" : ""}">${x.h}/${x.n}</td>`;
   $("poolBody").innerHTML = shown.map(l => {
     const i = l.id, info = legInfo(l);
@@ -844,6 +857,8 @@ function render() { renderControls(); renderSuggestions(); renderSlip(); renderP
 document.querySelector(".rail").addEventListener("click", e => { const b = e.target.closest("[data-n]"); if (b) { S.legs = Number(b.dataset.n); render(); } });
 document.querySelector(".rail").addEventListener("change", e => {
   const t = e.target;
+  if (t.dataset.gall) { gameSel.clear(); render(); return; }
+  if (t.dataset.game) { t.checked ? gameSel.add(t.dataset.game) : gameSel.delete(t.dataset.game); render(); return; }
   if (t.dataset.prop) S.props = PROPS.filter(p => document.querySelector(`[data-prop="${p}"]`).checked);
   else if (t.dataset.side) S.sides = ["over", "under"].filter(s => document.querySelector(`[data-side="${s}"]`).checked);
   else if (t.id === "legsUpTo") S.upTo = t.checked;

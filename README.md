@@ -10,7 +10,7 @@ A mobile-friendly web app that loads today's NBA slate, pulls live player-prop o
 - **Pulls player props on demand:** points, threes, assists and rebounds for the games you choose, from all US books in one request per game.
 - **Prices every leg:** removes the vig from each book's over/under, averages the books into a consensus fair probability, and compares it with your sportsbook's price.
 - **Suggests parlays:** searches every allowed combination of the best legs and ranks them by expected value, hit probability or payout.
-- **Gives you manual control:** number of legs, prop types, overs/unders, minimum edge, minimum hit %, minimum books, max legs per game, and lock/exclude on individual legs.
+- **Gives you manual control:** a game filter (one or more games), number of legs, prop types, overs/unders, minimum edge, minimum hit %, minimum books, max legs per game, and lock/exclude on individual legs.
 - **Shows player history:** tap any leg to see the player's last 5 and last 10 games against tonight's line, with hit rate, average, a bar chart and a game log.
 - **Flags availability risks:** a ⚠ marks players who missed their team's last game(s) or whose minutes fell sharply over their last 3 games.
 - **Scans recent form:** L5 and L10 hit-rate columns in the leg pool, a sort by L5/L10, a "Min L10 hit %" filter, and an option to skip flagged players.
