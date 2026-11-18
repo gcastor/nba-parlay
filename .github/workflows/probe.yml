@@ -1,0 +1,29 @@
+name: probe (temporary)
+on: workflow_dispatch
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          UA="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36"
+          u=https://cdn.nba.com/static/json/staticData/scheduleLeagueV2.json
+          echo "nba plain: $(curl -s -o /dev/null -w '%{http_code}' $u)"
+          echo "nba browser: $(curl -s -o /dev/null -w '%{http_code}' --compressed -H "User-Agent: $UA" -H 'Accept: application/json, text/plain, */*' -H 'Accept-Language: en-US,en;q=0.9' -H 'Origin: https://www.nba.com' -H 'Referer: https://www.nba.com/' $u)"
+          b=https://cdn.nba.com/static/json/liveData/scoreboard/todaysScoreboard_00.json
+          echo "nba scoreboard: $(curl -s -o /dev/null -w '%{http_code}' --compressed -H "User-Agent: $UA" -H 'Origin: https://www.nba.com' -H 'Referer: https://www.nba.com/' $b)"
+          e="https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard?dates=20261116"
+          echo "espn scoreboard: $(curl -s -o /tmp/e.json -w '%{http_code}' -H "User-Agent: $UA" "$e")"
+          gid=$(python3 -c "import json;d=json.load(open('/tmp/e.json'));print(d['events'][0]['id'])")
+          echo "espn game $gid"
+          curl -s -H "User-Agent: $UA" "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/summary?event=$gid" -o /tmp/s.json -w 'espn summary: %{http_code}\n'
+          python3 - <<'PY'
+          import json
+          d=json.load(open('/tmp/s.json'))
+          bs=d['boxscore']['players']
+          for t in bs:
+              s=t['statistics'][0]
+              print(t['team']['abbreviation'], s.get('names') or s.get('labels'), s.get('keys'))
+              a=s['athletes'][0]; print(' ', a['athlete']['displayName'], a['athlete'].get('id'), a.get('stats'), a.get('didNotPlay'))
+          print('date', d['header']['competitions'][0]['date'])
+          for c in d['header']['competitions'][0]['competitors']: print(c['homeAway'], c['team']['abbreviation'])
+          PY
