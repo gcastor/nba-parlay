@@ -21,11 +21,13 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - name: Pull last night's box scores (ESPN)
+      - name: Pull last night's NBA box scores (ESPN)
         run: python scripts/update_stats.py
+      - name: Pull finished NFL box scores (ESPN)
+        run: python scripts/update_nfl_stats.py
       - name: Commit updated stats
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898283+github-actions[bot]@users.noreply.github.com"
-          git add data/player_logs.json
+          git add data/player_logs.json data/nfl_logs.json
           if git diff --cached --quiet; then echo "No changes"; else git commit -m "Update player stats" && git push; fi
