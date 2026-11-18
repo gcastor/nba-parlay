@@ -7,7 +7,7 @@ A mobile-friendly web app that loads today's NBA slate, pulls live player-prop o
 ## What it does
 
 - **Loads the day's slate:** lists today's games with Eastern tip times (free API call).
-- **Pulls player props on demand:** points, threes, assists and rebounds for the games you choose, from all US books in one request per game.
+- **Pulls player props on demand:** points, threes, assists and rebounds by default, plus optional PRA, Pts+Reb, Pts+Ast, Reb+Ast, double-double and triple-double, for the games you choose, from all US books in one request per game. Only ticked prop types are pulled, and later pulls add to what's already loaded.
 - **Prices every leg:** removes the vig from each book's over/under, averages the books into a consensus fair probability, and compares it with your sportsbook's price.
 - **Suggests parlays:** searches every allowed combination of the best legs and ranks them by expected value, hit probability or payout.
 - **Gives you manual control:** a game filter (one or more games), number of legs, prop types, overs/unders, minimum edge, minimum hit %, minimum books, max legs per game, and lock/exclude on individual legs.
@@ -88,7 +88,7 @@ There is no server. The only scheduled job is the nightly stats update, which ru
 3. Tick the games you want, untick prop types you don't bet, and tap **Pull props**. The button shows the credit cost first.
 4. Set the number of legs and filters, then pick a suggestion or add legs to your slip.
 
-**Credit cost:** 1 credit per prop type per game (one region). A 7-game slate with all four prop types costs about 28 credits. Loading the game list is free.
+**Credit cost:** 1 credit per prop type per game (one region). Double-double and triple-double are Yes/No markets; a leg is priced only when at least one book quotes both Yes and No. A 7-game slate with all four prop types costs about 28 credits. Loading the game list is free.
 
 ## Limitations
 
