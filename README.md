@@ -2,7 +2,7 @@
 
 A mobile-friendly web app that loads today's NBA slate, pulls live player-prop odds from every major US sportsbook, prices each leg against the market consensus, and ranks parlay combinations by expected value.
 
-**Live app:** https://gcastor.github.io/nba-parlay/
+**Live apps:** NBA: https://gcastor.github.io/nba-parlay/ · NFL: https://gcastor.github.io/nba-parlay/nfl/
 
 ## What it does
 
@@ -19,6 +19,10 @@ A mobile-friendly web app that loads today's NBA slate, pulls live player-prop o
 - **Builds the slip:** combined odds, fair odds, hit %, book's implied %, EV, payout for your stake, and a Kelly stake suggestion.
 - **Shops lines:** shows when another book pays more on the same leg.
 - **Saves credits:** caches pulled odds in the browser for the day, so reloading is free, and lets you refresh only the games you're about to bet.
+
+## NFL version
+
+`nfl/index.html` is the same app for the NFL: this week's games (Thursday–Monday), and props for passing yards and TDs, rushing yards and attempts, receptions, receiving yards, rushing + receiving yards, anytime TD and 2+ TDs. It shows last-5-game history from `data/nfl_logs.json` (built nightly by `scripts/update_nfl_stats.py`). Touchdown props are usually posted "Yes" only, so when no book prices "No", fair % is estimated from the average Yes price minus an assumed ~8% margin and marked "est.". The NFL page shares the Odds API key saved on the NBA page.
 
 ## Methodology
 
