@@ -179,7 +179,7 @@ tr.hist td { white-space: normal; background: var(--bg); padding: 12px; }
 .flag { color: var(--warn); margin-left: 4px; cursor: help; }
 .lx { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
 .lx.hi { color: var(--good); } .lx.lo { color: var(--bad); }
-.sec-head .pool-tools { display: flex; gap: 8px; align-items: center; font-size: 13px; color: var(--muted); }
+.sec-head .pool-tools { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; font-size: 13px; color: var(--muted); }
 .sec-head .pool-tools select { width: auto; padding: 4px 8px; }
 .notes { grid-column: 1 / -1; display: flex; flex-direction: column; gap: 6px; }
 .note { background: var(--warn-soft); color: var(--warn); border-radius: 6px; padding: 6px 10px; font-size: 13px; }
@@ -296,7 +296,8 @@ tr.hist td { white-space: normal; background: var(--bg); padding: 12px; }
 
     <section class="card" aria-labelledby="poolH">
       <div class="sec-head"><h2 id="poolH">Leg pool</h2>
-        <div class="pool-tools"><label for="poolSort">Sort by</label><select id="poolSort"><option value="ev">EV</option><option value="edge">Edge</option><option value="fair">Fair %</option><option value="l5">L5 hit %</option><option value="l10">L10 hit %</option><option value="odds">Odds</option></select></div>
+        <div class="pool-tools"><label for="poolProp">Prop</label><select id="poolProp"><option value="all">All props</option><option value="points">Points</option><option value="rebounds">Rebounds</option><option value="assists">Assists</option><option value="threes">Threes</option></select>
+          <label for="poolSort">Sort by</label><select id="poolSort"><option value="ev">EV</option><option value="edge">Edge</option><option value="fair">Fair %</option><option value="l5">L5 hit %</option><option value="l10">L10 hit %</option><option value="odds">Odds</option></select></div>
         <span class="meta">L5 and L10 count how often the leg would have hit in the player's last 5 and 10 games; ⚠ marks a player who missed recent games or is losing minutes. Tap a leg to see the player's last 5 and 10 games against the line. Fair % is the average no-vig probability across books. Lock puts a leg in every suggestion, Exclude drops it, + adds it to your slip.</span></div>
       <div class="tablewrap"><table>
         <thead><tr><th>Player</th><th>Game</th><th>Prop</th><th>Side</th><th class="n">Line</th><th class="n">Your odds</th><th class="n">Fair %</th><th class="n">Books</th><th class="n">Edge</th><th class="n">L5</th><th class="n">L10</th><th>Best price</th><th>Suggest</th><th></th></tr></thead>
@@ -323,7 +324,7 @@ const abbr = n => TEAM[n] || (n || "").split(" ").pop().slice(0, 3).toUpperCase(
 
 const DEFAULTS = { legs: 3, upTo: false, props: [...PROPS], sides: ["over", "under"], minEdge: "-1", minProb: "0",
   maxGame: "1", rankBy: "ev", minBooks: "3", poolCap: "25", bankroll: 500, kellyFrac: "0.25", book: "draftkings", wager: 10,
-  minL10: "0", skipFlagged: false, poolSort: "ev" };
+  minL10: "0", skipFlagged: false, poolSort: "ev", poolProp: "all" };
 const store = {
   get(k) { try { return JSON.parse(localStorage.getItem("nbaSlate." + k)); } catch (e) { return null; } },
   set(k, v) { try { localStorage.setItem("nbaSlate." + k, JSON.stringify(v)); } catch (e) {} }
@@ -555,7 +556,7 @@ function renderControls() {
   $("legsUpTo").checked = S.upTo;
   $("propChips").innerHTML = PROPS.map(p => `<label class="chip"><input type="checkbox" data-prop="${p}" ${S.props.includes(p) ? "checked" : ""}><span>${p[0].toUpperCase() + p.slice(1)}</span></label>`).join("");
   $("sideChips").innerHTML = ["over", "under"].map(s => `<label class="chip"><input type="checkbox" data-side="${s}" ${S.sides.includes(s) ? "checked" : ""}><span>${s === "over" ? "Overs" : "Unders"}</span></label>`).join("");
-  for (const id of ["minEdge", "minProb", "maxGame", "rankBy", "minBooks", "poolCap", "kellyFrac", "book", "minL10", "poolSort"]) $(id).value = S[id];
+  for (const id of ["minEdge", "minProb", "maxGame", "rankBy", "minBooks", "poolCap", "kellyFrac", "book", "minL10", "poolSort", "poolProp"]) $(id).value = S[id];
   $("skipFlagged").checked = !!S.skipFlagged;
   $("bankroll").value = S.bankroll;
   if (document.activeElement !== $("wager")) $("wager").value = S.wager;
@@ -637,8 +638,9 @@ function renderPool() {
   const lrate = x => x && x.n ? x.h / x.n : -1;
   const sorters = { ev: (a, b) => b.ev - a.ev, edge: (a, b) => b.edge - a.edge, fair: (a, b) => b.mp - a.mp, odds: (a, b) => b.dec - a.dec,
     l5: (a, b) => lrate(legInfo(b).l5) - lrate(legInfo(a).l5) || b.ev - a.ev, l10: (a, b) => lrate(legInfo(b).l10) - lrate(legInfo(a).l10) || b.ev - a.ev };
-  const shown = legs.filter(l => !gameSel.size || gameSel.has(l.gameId)).sort(sorters[S.poolSort] || sorters.ev);
+  const shown = legs.filter(l => (!gameSel.size || gameSel.has(l.gameId)) && (S.poolProp === "all" || l.prop === S.poolProp)).sort(sorters[S.poolSort] || sorters.ev);
   const lcell = x => !x || !x.n ? `<td class="n lx">–</td>` : `<td class="n lx ${x.h / x.n >= 0.6 ? "hi" : x.h / x.n <= 0.4 ? "lo" : ""}">${x.h}/${x.n}</td>`;
+  if (!shown.length) { $("poolBody").innerHTML = `<tr><td colspan="14">No ${S.poolProp === "all" ? "" : PROP_LABEL[S.poolProp] + " "}props for the selected game${gameSel.size > 1 ? "s" : ""}. Change the Prop menu or the game filter.</td></tr>`; return; }
   $("poolBody").innerHTML = shown.map(l => {
     const i = l.id, info = legInfo(l);
     const st = legState[l.id] || "", cls = st === "excl" ? "excluded" : st === "lock" ? "locked" : !eligible(l) ? "filtered" : "";
@@ -869,6 +871,7 @@ document.querySelector(".rail").addEventListener("change", e => {
   render();
 });
 $("poolSort").onchange = e => { S.poolSort = e.target.value; render(); };
+$("poolProp").onchange = e => { S.poolProp = e.target.value; render(); };
 $("book").innerHTML = BOOKS.map(([k, n]) => `<option value="${k}">${n}</option>`).join("");
 $("book").onchange = e => { S.book = e.target.value; buildLegs(); render(); };
 $("apiKey").value = store.get("key") || "";
