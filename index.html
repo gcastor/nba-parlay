@@ -621,7 +621,7 @@ const STAT_COL = { points: 4, rebounds: 5, assists: 6, threes: 7 };
 let openLeg = null;
 const statsState = { loaded: false, loading: false, error: null, byName: new Map(), byLast: new Map(), players: {}, updated: null };
 const normName = n => (n || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase()
-  .replace(/[.'’`-]/g, " ").replace(/\b(jr|sr|ii|iii|iv|v)\b/g, " ").replace(/\s+/g, " ").trim();
+  .replace(/\./g, "").replace(/['’`-]/g, " ").replace(/\b(jr|sr|ii|iii|iv|v)\b/g, " ").replace(/\s+/g, " ").trim();
 
 async function loadStats() {
   statsState.loading = true; statsState.error = null;
