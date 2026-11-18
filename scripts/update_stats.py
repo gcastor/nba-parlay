@@ -17,6 +17,7 @@ BASE = "https://site.api.espn.com/apis/site/v2/sports/basketball/nba"
 OUT = Path(__file__).resolve().parent.parent / "data" / "player_logs.json"
 ET = ZoneInfo("America/New_York")
 KEEP = 25                       # most recent games kept per player
+SCHEMA = 2                      # bump to rebuild the file when the row format changes
 SKIP_SEASON_TYPES = {1}         # 1 = preseason
 # ESPN abbreviations that differ from the NBA tricodes the app uses
 ABBR = {"GS": "GSW", "NY": "NYK", "SA": "SAS", "NO": "NOP", "UTAH": "UTA", "WSH": "WAS"}
@@ -45,8 +46,19 @@ def season_start(today):
     return date(year, 10, 1), f"{year}-{str(year + 1)[2:]}"
 
 
+def pos_bucket(a):
+    """ESPN position (PG, SG, SF, PF, C, G, F, G-F, ...) -> 'G' | 'F' | 'C' | ''"""
+    pos = ((a.get("athlete") or {}).get("position") or a.get("position") or {})
+    ab = (pos.get("abbreviation") or "").upper() if isinstance(pos, dict) else ""
+    if not ab:
+        return ""
+    if ab.startswith("C"):
+        return "C"
+    return "G" if "G" in ab.split("-")[0] else "F"
+
+
 def parse_box(summary, game_date, gid):
-    """-> list of (espn_player_id, name, team, row)"""
+    """-> list of (espn_player_id, name, team, position, row)"""
     comp = summary["header"]["competitions"][0]
     side = {c["team"]["abbreviation"]: c["homeAway"] for c in comp["competitors"]}
     teams = [c["team"]["abbreviation"] for c in comp["competitors"]]
@@ -76,8 +88,8 @@ def parse_box(summary, game_date, gid):
                     continue
                 row = [game_date, tri(opp), 1 if side.get(abbr) == "home" else 0, mins,
                        val("points"), val("rebounds"), val("assists"),
-                       val("threePointFieldGoalsMade-threePointFieldGoalsAttempted", made=True), gid]
-                out.append((str(a["athlete"]["id"]), a["athlete"].get("displayName", ""), tri(abbr), row))
+                       val("threePointFieldGoalsMade-threePointFieldGoalsAttempted", made=True), gid, tri(abbr)]
+                out.append((str(a["athlete"]["id"]), a["athlete"].get("displayName", ""), tri(abbr), pos_bucket(a), row))
     return out
 
 
@@ -85,8 +97,9 @@ def main():
     today = datetime.now(ET).date()
     start, season = season_start(today)
     data = json.loads(OUT.read_text()) if OUT.exists() else {}
-    if data.get("season") != season or data.get("source") != "espn":
-        data = {"season": season, "source": "espn", "dates_done": [], "games_done": [], "players": {}}
+    if data.get("season") != season or data.get("source") != "espn" or data.get("v") != SCHEMA:
+        print("Building the season file from scratch.")
+        data = {"season": season, "source": "espn", "v": SCHEMA, "dates_done": [], "games_done": [], "players": {}}
     dates_done, games_done, players = set(data["dates_done"]), set(data["games_done"]), data["players"]
 
     added = 0
@@ -111,9 +124,10 @@ def main():
                     print(f"  skip {gid}: {err}", file=sys.stderr)
                     all_final = False
                     continue
-                for pid, name, team, row in rows:
-                    rec = players.setdefault(pid, {"n": name, "t": team, "g": []})
+                for pid, name, team, pos, row in rows:
+                    rec = players.setdefault(pid, {"n": name, "t": team, "p": pos, "g": []})
                     rec["n"] = name or rec["n"]
+                    rec["p"] = pos or rec.get("p", "")
                     if not rec["g"] or ds >= rec["g"][0][0]:
                         rec["t"] = team
                     rec["g"] = sorted([r for r in rec["g"] if r[8] != gid] + [row],
@@ -128,7 +142,7 @@ def main():
 
     data.update(dates_done=sorted(dates_done), games_done=sorted(games_done),
                 updated=datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
-                fields=["date", "opp", "home", "min", "pts", "reb", "ast", "fg3m", "game_id"])
+                fields=["date", "opp", "home", "min", "pts", "reb", "ast", "fg3m", "game_id", "team"])
     OUT.parent.mkdir(parents=True, exist_ok=True)
     OUT.write_text(json.dumps(data, separators=(",", ":")))
     print(f"{season}: added {added} games; {len(games_done)} total; {len(players)} players; {OUT.stat().st_size / 1024:.0f} KB")
