@@ -1,0 +1,25 @@
+name: probe (temporary)
+on: workflow_dispatch
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          python3 - <<'PY'
+          import json, urllib.request
+          H={"User-Agent":"Mozilla/5.0"}
+          get=lambda u: json.load(urllib.request.urlopen(urllib.request.Request(u,headers=H),timeout=30))
+          sb=get("https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?dates=20261116")
+          print("week:", sb.get("week"), "season:", sb.get("season"))
+          evs=sb["events"]; print("events", len(evs), [ (e["id"], e["season"].get("type"), e["status"]["type"]["completed"], e["shortName"]) for e in evs][:3])
+          s=get("https://site.api.espn.com/apis/site/v2/sports/football/nfl/summary?event="+evs[0]["id"])
+          for t in s["boxscore"]["players"][:1]:
+              print("TEAM", t["team"]["abbreviation"])
+              for st in t["statistics"]:
+                  a=st["athletes"][0] if st.get("athletes") else {}
+                  print(" ", st.get("name"), st.get("keys"), "|", (a.get("athlete") or {}).get("displayName"), (a.get("athlete") or {}).get("position"), a.get("stats"))
+          print([ (c["homeAway"], c["team"]["abbreviation"]) for c in s["header"]["competitions"][0]["competitors"]])
+          sb2=get("https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?dates=20260901-20261118&limit=400")
+          print("range events:", len(sb2.get("events",[])), "types:", sorted({e["season"]["type"] for e in sb2["events"]}))
+          print("all abbrs:", sorted({c["team"]["abbreviation"] for e in sb2["events"] for c in e["competitions"][0]["competitors"]}))
+          PY
